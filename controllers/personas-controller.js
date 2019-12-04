@@ -1,5 +1,8 @@
 // Incluir el fichero con la definición de la BD
 var db = require('../db/db');
+const { validationResult } = require("express-validator");
+const ObjectID = require("mongodb").ObjectID;
+
 
 // Conectar con la BD
 db.connect('mongodb://localhost:27017', function (err) {
@@ -11,34 +14,20 @@ db.connect('mongodb://localhost:27017', function (err) {
 // Display all users
 module.exports.personaLista = function (req, res) {
     db.get().db('practica7').collection('persona').find({}).toArray(function (error, datos) {
-        var arrayRespuesta = []
-        // se elimina de la búsqueda de la base de datos, todos los _id
-        for (indice = 0; indice < datos.length; indice++) {
-            // se genera un objeto nuevo usando los datos del objeto de la
-            // base de datos pero solo usando los valores que nos interesan
-            let documentoRespuesta = {
-                "nombre": datos[indice].nombre,
-                "apellidos": datos[indice].apellidos,
-                "edad": datos[indice].edad,
-                "dni": datos[indice].dni,
-                "cumpleanos": datos[indice].cumpleanos,
-                "colorFavorito": datos[indice].colorFavorito,
-                "sexo": datos[indice].sexo
-            };
-            arrayRespuesta.push(documentoRespuesta)
-        }
         if (error) {
             throw ('Fallo en la conexión con la BD');
         } else {
-            res.send(arrayRespuesta);
+            res.send(datos);
         }
     });
-
-
 };
 
 // Create one user
 module.exports.personaCrear = function (req, res) {
+    const errors = validationResult(req); if (!errors.isEmpty()) {
+        return res.status(422).json({ errors: errors.array() });
+    }
+
     const persona = {};
     persona.nombre = req.body.nombre;
     persona.apellidos = req.body.apellidos;
@@ -52,6 +41,62 @@ module.exports.personaCrear = function (req, res) {
         if (err) {
             throw ('Fallo en la conexión con la BD');
         } else {
+            res.send(result);
+        }
+    });
+};
+
+// Update users
+module.exports.personaActualizar = function (req, res, next) {
+    if (db.get() === null) {
+        next(new Error('La conexión no está establecida'));
+        return;
+    }
+
+    const errors = validationResult(req); if (!errors.isEmpty()) {
+        return res.status(422).json({ errors: errors.array() });
+    }
+
+    const filter = { "_id": new ObjectID(req.params.id) };
+    const update = {
+        $set: {
+            nombre: req.body.nombre,
+            appelidos: req.body.apellidos,
+            edad: req.body.edad,
+            dni: req.body.dni,
+            cumpleanos: req.body.cumpleanos,
+            colorFavorito: req.body.colorFavorito,
+            sexo: req.body.sexo,
+        }
+    };
+
+    // Insertar un documento
+    db.get().db('practica7').collection('persona').updateOne(filter, update, { upsert: true }, function (err, result) {
+        // Si se produjo un error, enviar el error a la siguiente función
+        if (err) {
+            next(new Error('Fallo en la conexión con la BD ' + err)); return;
+        } else {
+            res.send(result);
+        }
+    });
+};
+
+// Delete users
+module.exports.personaEliminar = function (req, res, next) {
+    if (db.get() === null) {
+        next(new Error('La conexión no está establecida'));
+        return;
+    }
+
+    const filter = { "_id": new ObjectID(req.params.id) };
+    // Eliminar un documento 
+    db.get().db('practica7').collection('persona').deleteOne(filter, function (err, result) {
+        // Si se produjo un error, enviar el error a la siguiente función
+        if (err) {
+            next(new Error('Fallo en la conexión con la BD'));
+            return;
+        } else {
+            // Si todo fue bien, devolver el resultado al cliente
             res.send(result);
         }
     });
